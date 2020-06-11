@@ -7,7 +7,9 @@ var redisClient = redis.createClient();
 var collections = {
   Rich: 123,
   Alessandro: 455,
-  Martin: 789
+  Martin: 789,
+  Emma: 1012,
+  Grace: 1114
 }
 
 var locations = {
@@ -18,9 +20,9 @@ var locations = {
 
 // Callback  for Query Parameter
 var queryParam = function(request,response,next) {
-  if(request.query.q === undefined){
+  if(!request.query.q){
     console.log(3);
-    next();
+    return next(); // after return, you won't get the following line
   }
   var answer  = {};
   answer[request.params.userId] = locations[request.params.userId];
@@ -33,10 +35,27 @@ var namedParam  = function(request,response) {
   console.log(5);
    redisClient.get(request.params.userId.toLowerCase(),(err,reply) => {
     console.log(6);
-     var answer = {};
-     answer[request.params.userId] =  reply;
-     response.send(answer);
+    var answer = {};
+
+    if(!reply && isUserAvailable(request)){
+      console.log(7);
+      answer[request.params.userId] = collections[request.params.userId];
+      response.send(answer);
+      return;
+    } 
+    console.log(8);
+    if(!isUserAvailable(request)){
+      response.redirect('/');// TODO: redirect to back res.redirect('back')  , https://en.wikipedia.org/wiki/HTTP_referer 
+      return;
+    }
+    answer[request.params.userId] = reply;
+    response.send(answer);   
   });
+  //TODO: HEADER, https://expressjs.com/en/4x/api.html#res.append
+}
+
+var isUserAvailable = function(requestObject){
+  return collections[requestObject.params.userId] ? true : false;
 }
 
 /* GET users listing. */
@@ -50,12 +69,12 @@ router.get('/:userId', function(request,response,next){ //NOTE: see that the req
   // Trying to cache
   redisClient.get(request.params.userId.toLowerCase(), (err,reply) => {
     console.log(request.params.userId);
-  if(reply === null){
+  if(reply === null && isUserAvailable(request) ){
     console.log(2);
-      redisClient.set(request.params.userId.toLowerCase(),collections[request.params.userId]);
+      redisClient.set(request.params.userId.toLowerCase(),collections[request.params.userId]?collections[request.params.userId]: Math.random() );
      }
   });
-  next();
+  next(); // no return here
 }, [queryParam,namedParam]);
 
 
